@@ -1,6 +1,6 @@
 # StyleTTS2 (Kokoro-82M Fine-tuning Fork)
 
-> **Note:** This branch (`kokoro-deutsch`) is a patched version of the original [yl4579/StyleTTS2](https://github.com/yl4579/StyleTTS2) repository. It is maintained specifically as a git submodule for the **[kokoro-deutsch](https://github.com/semidark/kokoro-deutsch)** training recipe.
+> **Note:** This fork's `main` branch is a patched version of the original [yl4579/StyleTTS2](https://github.com/yl4579/StyleTTS2) repository. It is maintained specifically as a git submodule for the **[kokoro-deutsch](https://github.com/semidark/kokoro-deutsch)** training recipe.
 
 ## Why this fork exists
 
