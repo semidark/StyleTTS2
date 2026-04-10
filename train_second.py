@@ -503,6 +503,16 @@ def main(config_path):
                 st.unsqueeze(1) if multispeaker else gt.unsqueeze(1)
             )
 
+            y_rec_gt = wav.unsqueeze(1)
+            y_rec_gt_pred = model.decoder(en, F0_real, N_real, s)
+
+            if epoch >= joint_epoch:
+                # ground truth from recording
+                wav = y_rec_gt  # use recording since decoder is tuned
+            else:
+                # ground truth from reconstruction
+                wav = y_rec_gt_pred  # use reconstruction since decoder is fixed
+
             F0_fake, N_fake = model.predictor.F0Ntrain(p_en, s_dur)
 
             y_rec = model.decoder(en, F0_fake, N_fake, s)
