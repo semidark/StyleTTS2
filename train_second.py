@@ -342,11 +342,6 @@ def main(config_path):
     model = build_model(model_params, text_aligner, pitch_extractor, plbert)
     _ = [model[key].to(device) for key in model]
 
-    # DP
-    for key in model:
-        if key != "mpd" and key != "msd" and key != "wd":
-            model[key] = MyDataParallel(model[key])
-
     start_epoch = 0
     iters = 0
 
@@ -452,6 +447,12 @@ def main(config_path):
         # Initialize predictor_encoder from trained style_encoder
         # (predictor_encoder is not trained in Stage 1)
         model.predictor_encoder = copy.deepcopy(model.style_encoder)
+
+    # DP — must happen AFTER load_checkpoint so state dict keys match
+    # (DataParallel adds 'module.' prefix which breaks strict=False loading)
+    for key in model:
+        if key != "mpd" and key != "msd" and key != "wd":
+            model[key] = MyDataParallel(model[key])
 
     n_down = model.text_aligner.n_down
 
