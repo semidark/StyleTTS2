@@ -289,6 +289,7 @@ def main(config_path):
         batch_percentage=slmadv_params.batch_percentage,
         skip_update=slmadv_params.iter,
         sig=slmadv_params.sig,
+        diffusion_enabled=(diff_epoch < epochs),
     )
 
     for epoch in range(start_epoch, epochs):
@@ -299,7 +300,7 @@ def main(config_path):
 
         _ = [model[key].train() for key in model]
 
-        if epoch >= diff_epoch:
+        if epoch >= joint_epoch:
             start_ds = True
 
         for i, batch in enumerate(train_dataloader):
