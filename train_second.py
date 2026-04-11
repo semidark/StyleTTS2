@@ -30,6 +30,7 @@ warnings.simplefilter("ignore")
 from torch.utils.tensorboard import SummaryWriter
 
 from meldataset import build_dataloader
+from kokoro_symbols import TextCleaner
 
 from Utils.ASR.models import ASRCNN
 from Utils.JDC.model import JDCNet
