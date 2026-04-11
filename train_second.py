@@ -95,7 +95,8 @@ def _prepare_test_tokens(text_cleaner):
     result = []
     for text in _TEST_SENTENCES:
         try:
-            ipa, _ = g2p(text)
+            g2p_out = g2p(text)
+            ipa = g2p_out[0] if isinstance(g2p_out, tuple) else g2p_out
             ipa = ipa.replace("\u028f", "y")  # ʏ → y fixup
             token_ids = text_cleaner(ipa)
             if not token_ids or len(token_ids) > 510:
