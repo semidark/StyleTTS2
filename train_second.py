@@ -361,9 +361,6 @@ def main(config_path):
                 first_stage_path,
                 load_only_params=True,
                 ignore_modules=[
-                    "bert",
-                    "bert_encoder",
-                    "predictor",
                     "predictor_encoder",
                     "msd",
                     "mpd",
