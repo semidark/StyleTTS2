@@ -36,6 +36,8 @@ import librosa
 
 from models import *
 from meldataset import build_dataloader
+from kokoro_symbols import TextCleaner
+from kokoro_tb_utils import prepare_test_tokens, extract_voicepack, run_kokoro_inference
 from utils import *
 from losses import *
 from optimizers import build_optimizer
@@ -198,6 +200,40 @@ def main(config_path):
     gl = GeneratorLoss(model.mpd, model.msd).to(device)
     dl = DiscriminatorLoss(model.mpd, model.msd).to(device)
     wl = WavLMLoss(model_params.slm.model, model.wd, sr, model_params.slm.sr).to(device)
+
+    # ── Kokoro-faithful TensorBoard inference setup ───────────────────────────
+    if accelerator.is_main_process:
+        text_cleaner = TextCleaner()
+        _test_tokens = prepare_test_tokens(text_cleaner)
+        if _test_tokens:
+            logger.info(
+                f"TensorBoard inference: prepared {len(_test_tokens)} test sentences"
+            )
+        else:
+            logger.warning(
+                "TensorBoard inference: no test sentences available (misaki/espeak not found?)"
+            )
+
+        # Generate pretrained baseline before any training updates
+        _ = [model[key].eval() for key in model]
+        logger.info("Extracting pretrained baseline voicepack for TensorBoard...")
+        _baseline_voicepack, _baseline_acoustic_norm, _baseline_prosodic_norm = (
+            extract_voicepack(model, root_path, device, n_samples=200)
+        )
+        if _baseline_voicepack is not None:
+            writer.add_scalar("baseline/acoustic_norm", _baseline_acoustic_norm, 0)
+            writer.add_scalar("baseline/prosodic_norm", _baseline_prosodic_norm, 0)
+            logger.info(
+                f"  acoustic_norm={_baseline_acoustic_norm:.4f}  prosodic_norm={_baseline_prosodic_norm:.4f}"
+            )
+            _baseline_audio = run_kokoro_inference(
+                model, _test_tokens, _baseline_voicepack, device, text_cleaner
+            )
+            for i, (text, audio) in enumerate(_baseline_audio):
+                writer.add_audio(f"baseline/test_{i + 1:02d}", audio, 0, sample_rate=sr)
+                logger.info(f"  baseline/test_{i + 1:02d}: {text[:60]}")
+        _ = [model[key].train() for key in model]
+    # ─────────────────────────────────────────────────────────────────────────
 
     for epoch in range(start_epoch, epochs):
         running_loss = 0
@@ -505,34 +541,35 @@ def main(config_path):
                 save_path = osp.join(log_dir, "epoch_1st_%05d.pth" % epoch)
                 torch.save(state, save_path)
 
-            with torch.no_grad():
-                for bib in range(len(asr)):
-                    mel_length = int(mel_input_length[bib].item())
-                    gt = mels[bib, :, :mel_length].unsqueeze(0)
-                    en = asr[bib, :, : mel_length // 2].unsqueeze(0)
-
-                    F0_real, _, _ = model.pitch_extractor(gt.unsqueeze(1))
-                    s = model.style_encoder(gt.unsqueeze(1))
-                    real_norm = log_norm(gt.unsqueeze(1)).squeeze(1)
-
-                    y_rec = model.decoder(en, F0_real, real_norm, s)
-
+            # ── Kokoro-faithful TensorBoard inference (every epoch) ───────────
+            _ = [model[key].eval() for key in model]
+            logger.info(
+                f"Epoch {epoch}: extracting voicepack for TensorBoard inference..."
+            )
+            _vp, _acoustic_norm, _prosodic_norm = extract_voicepack(
+                model,
+                root_path,
+                device,
+                n_samples=200,
+            )
+            writer.add_scalar("voicepack/acoustic_norm", _acoustic_norm, epoch + 1)
+            writer.add_scalar("voicepack/prosodic_norm", _prosodic_norm, epoch + 1)
+            logger.info(
+                f"  acoustic_norm={_acoustic_norm:.4f}  prosodic_norm={_prosodic_norm:.4f}"
+            )
+            if _vp is not None and _test_tokens:
+                _epoch_audio = run_kokoro_inference(
+                    model, _test_tokens, _vp, device, text_cleaner
+                )
+                for i, (text, audio) in enumerate(_epoch_audio):
                     writer.add_audio(
-                        "eval/y" + str(bib),
-                        y_rec.cpu().numpy().squeeze(),
-                        epoch,
+                        f"inference/test_{i + 1:02d}",
+                        audio,
+                        epoch + 1,
                         sample_rate=sr,
                     )
-                    if epoch == 0:
-                        writer.add_audio(
-                            "gt/y" + str(bib),
-                            waves[bib].squeeze(),
-                            epoch,
-                            sample_rate=sr,
-                        )
-
-                    if bib >= 6:
-                        break
+            _ = [model[key].train() for key in model]
+            # ───────────────────────────────────────────────────────────────────
 
     if accelerator.is_main_process:
         print("Saving..")
