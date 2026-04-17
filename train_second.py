@@ -97,6 +97,7 @@ def main(config_path):
     root_path = data_params["root_path"]
     min_length = data_params["min_length"]
     OOD_data = data_params["OOD_data"]
+    num_workers = data_params.get("num_workers", 2)
 
     max_len = config.get("max_len", 200)
 
@@ -115,7 +116,7 @@ def main(config_path):
         OOD_data=OOD_data,
         min_length=min_length,
         batch_size=batch_size,
-        num_workers=2,
+        num_workers=num_workers,
         dataset_config={},
         device=device,
     )
